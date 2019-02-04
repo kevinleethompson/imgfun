@@ -1,6 +1,6 @@
-use std::io::prelude::*;
-use std::fs::File;
-use nalgebra::Vector3;
+mod utils;
+use utils::Vector3;
+use utils::render_funcs::save_ppm_image;
 
 fn main() {
     render();
@@ -17,25 +17,5 @@ fn render() {
         }
     }
 
-    save_ppm_image(WIDTH, HEIGHT, pix_vec);
-}
-
-fn save_ppm_image(width: usize, height: usize, pixels: Vec<Vector3<f32>>) {
-    // header for the RGB ppm file format
-    let mut buffer = ["P3\n", &(width.to_string()), " ", &(height.to_string()), "\n255\n"].concat(); 
-    // for every pixel in our image 
-    for x in 0..width*height {
-        for n in 0..3 {
-            // convert each color val of the pixel to binary decimal number and add to str buffer
-            let color_val = format!("{} ", (255. * 0f32.max(1f32.min(pixels[x][n]))) as u32);
-            buffer.push_str(&color_val);
-        }
-        // if the last pixel written is a multiple of the width of the image (so, at the edge), start a new row;
-        // else add extra space of separation between this pixel and the following pixel
-        let str_to_add = if x > 0 && x % width == 0 { "\n" } else { " " };
-        buffer.push_str(str_to_add);
-    }
-
-    let mut f = File::create("test.ppm").unwrap();
-    f.write(buffer.as_bytes()).unwrap();
+    save_ppm_image("test.ppm", WIDTH, HEIGHT, pix_vec);
 }
