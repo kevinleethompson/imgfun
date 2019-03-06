@@ -18,8 +18,8 @@ fn main() {
     
     let lights = vec![
         Light::new(&Vector3::new(-20., 20., 20.), &1.5),
-        Light::new(&Vector3::new(-20., 20., 20.), &1.8),
-        Light::new(&Vector3::new(-20., 20., 20.), &1.7)
+        Light::new(&Vector3::new(30., 50., -25.), &1.8),
+        Light::new(&Vector3::new(30., 20., 30.), &1.7)
     ];
 
     render(&spheres, &lights);

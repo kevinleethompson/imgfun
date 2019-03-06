@@ -111,7 +111,7 @@ pub mod render_funcs {
                     for l in light_vec {
                         let light_dir: Vector3<f32> = (l.position - *point).normalize();
                         diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(N));
-                        specular_light_intesity += specular_exponent.powf(0f32.max(-reflect(&-light_dir, N).dot(dir))) * l.intensity;
+                        specular_light_intesity += 0f32.max(-reflect(&-light_dir, N).dot(dir)).powf(specular_exponent) * l.intensity;
                     }
                     diffuse_color * diffuse_light_intensity * albedo[0] + Vector3::new(1.,1.,1.) * specular_light_intesity * albedo[1]
                 } else {
