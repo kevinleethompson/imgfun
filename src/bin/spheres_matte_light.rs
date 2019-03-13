@@ -32,7 +32,7 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>) {
             let x = (2. * (i as f32 + 0.5)/WIDTH as f32 - 1.) * (FOV as f32/2.).tan() * WIDTH as f32/HEIGHT as f32;
             let y = -(2. * (j as f32 + 0.5)/HEIGHT as f32 - 1.) * (FOV as f32/2.).tan();
             let dir = Vector3::new(x, y, -1.).normalize();
-            pix_vec[i+j*WIDTH] = cast_ray(&Vector3::new(0.,0.,0.), &dir, &spheres, Option::Some(lights)); 
+            pix_vec[i+j*WIDTH] = cast_ray(&Vector3::new(0.,0.,0.), &dir, &spheres, Option::Some(lights), None); 
         }
     }
 

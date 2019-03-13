@@ -1,13 +1,13 @@
 use std::f32;
 
 mod utils;
-use utils::{Vector2, Vector3};
+use utils::{Vector3, Vector4};
 use utils::objects::{Sphere, Material, Light};
 use utils::render_funcs::{cast_ray, save_ppm_image};
 
 fn main() {
-    let ivory = Material::smooth(Vector2::new(0.6, 0.3), Vector3::new(0.4, 0.4, 0.3), 50.);
-    let red_rubber = Material::smooth(Vector2::new(0.9, 0.1), Vector3::new(0.3, 0.1, 0.1), 10.);
+    let ivory = Material::smooth(Vector4::new(0.6, 0.3, 0.1, 0.), 1., Vector3::new(0.4, 0.4, 0.3), 50.);
+    let red_rubber = Material::smooth(Vector4::new(0.9, 0.1, 0., 0.), 1., Vector3::new(0.3, 0.1, 0.1), 10.);
 
     let spheres = vec![
         Sphere::new(Vector3::new(-3., 0., -16.), 2., ivory),
@@ -36,9 +36,9 @@ fn render(spheres: &Vec<Sphere>, lights: &Vec<Light>) {
             let x = (2. * (i as f32 + 0.5)/WIDTH as f32 - 1.) * (FOV as f32/2.).tan() * WIDTH as f32/HEIGHT as f32;
             let y = -(2. * (j as f32 + 0.5)/HEIGHT as f32 - 1.) * (FOV as f32/2.).tan();
             let dir = Vector3::new(x, y, -1.).normalize();
-            pix_vec[i+j*WIDTH] = cast_ray(&Vector3::new(0.,0.,0.), &dir, &spheres, Option::Some(lights)); 
+            pix_vec[i+j*WIDTH] = cast_ray(&Vector3::new(0.,0.,0.), &dir, &spheres, Option::Some(lights), None); 
         }
     }
 
-    save_ppm_image("spheres_spec_light_shadows.ppm", WIDTH, HEIGHT,pix_vec);
+    save_ppm_image("spheres_spec_light_shadows.ppm", WIDTH, HEIGHT, pix_vec);
 }

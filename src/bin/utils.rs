@@ -1,14 +1,15 @@
-pub use nalgebra::{Vector2, Vector3};
+pub use nalgebra::{Vector3, Vector4};
 
 pub mod objects {
-    use super::{Vector2, Vector3};
+    use super::{Vector3, Vector4};
 
     #[derive(Clone, Copy)]
     pub struct Matte { pub diffuse_color: Vector3<f32> }
 
     #[derive(Clone, Copy)]
     pub struct Smooth {
-        pub albedo: Vector2<f32>,
+        pub albedo: Vector4<f32>,
+        pub refractive_index: f32,
         pub diffuse_color: Vector3<f32>,
         pub specular_exponent: f32
     }
@@ -24,8 +25,8 @@ pub mod objects {
             Material::Matte( Matte { diffuse_color: color } )
         }
 
-        pub fn smooth(a: Vector2<f32>, color: Vector3<f32>, spec: f32) -> Material {
-            Material::Smooth( Smooth { albedo: a, diffuse_color: color, specular_exponent: spec } )
+        pub fn smooth(a: Vector4<f32>, r: f32, color: Vector3<f32>, spec: f32) -> Material {
+            Material::Smooth( Smooth { albedo: a, refractive_index: r, diffuse_color: color, specular_exponent: spec } )
         }
     }
 
@@ -75,21 +76,32 @@ pub mod objects {
 pub mod render_funcs {
     use std::io::prelude::*;
     use std::fs::File;
-    use super::{Vector2, Vector3};
+    use super::{Vector3};
     use super::objects::{Sphere, Material, Light, Smooth, Matte};
     use std::f32;
 
-    pub fn reflect(I: &Vector3<f32>, N: &Vector3<f32>) -> Vector3<f32> {
+    fn reflect(I: &Vector3<f32>, N: &Vector3<f32>) -> Vector3<f32> {
         return I - N * 2. * (I.dot(N));
     }
 
-    pub fn cast_ray(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, lights: Option<&Vec<Light>>) -> Vector3<f32> {
-        let mut point = &mut Vector3::new(0.,0.,0.);
-        let mut N = &mut Vector3::new(0.,0.,0.);
+    fn refract(I: &Vector3<f32>, N: &Vector3<f32>, eta_t: &f32, eta_i: &f32) -> Vector3<f32> { // Snell's law
+        let mut cosi: f32 = -(-1f32).max(1f32.min(I.dot(N)));
+        if cosi < 0. { // if the ray is inside the object, swap the indices and invert the normal to get the correct result
+            return refract(I, &-N, eta_i, eta_t);
+        }
+        let eta: f32 = eta_i / eta_t;
+        let k: f32 = 1. - eta * eta * (1. - cosi * cosi);
+        if k < 0. { Vector3::new(1.,0.,0.) } else { I * eta + N * (eta * cosi - k.sqrt()) }
+    }
+
+    pub fn cast_ray(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, lights: Option<&Vec<Light>>, depth: Option<i32>) -> Vector3<f32> {
+        let mut point = Vector3::new(0.,0.,0.);
+        let mut N = Vector3::new(0.,0.,0.);
         let mut material = Material::matte(Vector3::new(0.,0.,0.));
+        let depth = depth.unwrap_or(0);
         let mut diffuse_light_intensity = 0.;
 
-        if !scene_intersect(orig, dir, spheres, &mut point, &mut N, &mut material) {
+        if depth > 4 || !scene_intersect(orig, dir, spheres, &mut point, &mut N, &mut material) {
             return Vector3::new(0.2, 0.7, 0.8); // background color
         }
 
@@ -97,23 +109,43 @@ pub mod render_funcs {
             Material::Matte(Matte { diffuse_color }) => {
                 if let Some(light_vec) = lights {
                     for l in light_vec {
-                        let light_dir: Vector3<f32> = (l.position - *point).normalize();
-                        diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(N));
+                        let light_dir: Vector3<f32> = (l.position - point).normalize();
+                        diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(&N));
                     }
                     diffuse_color * diffuse_light_intensity
                 } else {
                     diffuse_color
                 }
             },
-            Material::Smooth(Smooth {albedo, diffuse_color, specular_exponent }) => {
+            Material::Smooth(Smooth {albedo, refractive_index, diffuse_color, specular_exponent }) => {
                 let mut specular_light_intesity = 0.;
+
+                let reflect_dir = reflect(dir, &N);
+                let reflect_orig = if reflect_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 };
+                let reflect_color = cast_ray(&reflect_orig, &reflect_dir, spheres, lights, Some(depth + 1));
+
+                let refract_dir = refract(dir, &N, &refractive_index, &1.).normalize();
+                let refract_orig = if refract_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 };
+                let refract_color = cast_ray(&refract_orig, &refract_dir, spheres, lights, Some(depth + 1));
+
                 if let Some(light_vec) = lights {
                     for l in light_vec {
-                        let light_dir: Vector3<f32> = (l.position - *point).normalize();
-                        diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(N));
-                        specular_light_intesity += 0f32.max(-reflect(&-light_dir, N).dot(dir)).powf(specular_exponent) * l.intensity;
+                        let light_dir: Vector3<f32> = (l.position - point).normalize();
+                        let light_distance: f32 = (l.position - point).norm();
+
+                        let shadow_orig: Vector3<f32> = if light_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 }; // checking if the point lies in the shadow of the lights[i]
+                        let mut shadow_point = Vector3::new(0.,0.,0.);
+                        let mut shadow_N = Vector3::new(0.,0.,0.);
+                        let mut tmp_material = Material::matte(Vector3::new(0.,0.,0.));
+
+                        if scene_intersect(&shadow_orig, &light_dir, spheres, &mut shadow_point, &mut shadow_N, &mut tmp_material) && (shadow_point-shadow_orig).norm() < light_distance {
+                            continue;
+                        }
+
+                        diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(&N));
+                        specular_light_intesity += 0f32.max(-reflect(&-light_dir, &N).dot(dir)).powf(specular_exponent) * l.intensity;
                     }
-                    diffuse_color * diffuse_light_intensity * albedo[0] + Vector3::new(1.,1.,1.) * specular_light_intesity * albedo[1]
+                    diffuse_color * diffuse_light_intensity * albedo[0] + Vector3::new(1.,1.,1.) * specular_light_intesity * albedo[1] + reflect_color * albedo[2] + refract_color * albedo[3]
                 } else {
                     diffuse_color
                 }
@@ -121,7 +153,7 @@ pub mod render_funcs {
         }
     }
 
-    pub fn scene_intersect(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, hit: &mut Vector3<f32>, N: &mut Vector3<f32>, material: &mut Material) -> bool {
+    fn scene_intersect(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, hit: &mut Vector3<f32>, N: &mut Vector3<f32>, material: &mut Material) -> bool {
         let mut spheres_dist = f32::MAX;
         for s in spheres.iter() {
             let mut dist_i = 0.;
