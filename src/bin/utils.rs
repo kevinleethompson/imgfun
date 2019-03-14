@@ -94,14 +94,14 @@ pub mod render_funcs {
         if k < 0. { Vector3::new(1.,0.,0.) } else { I * eta + N * (eta * cosi - k.sqrt()) }
     }
 
-    pub fn cast_ray(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, lights: Option<&Vec<Light>>, depth: Option<i32>) -> Vector3<f32> {
+    pub fn cast_ray(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, lights: Option<&Vec<Light>>, depth: Option<i32>, checkerboard: bool) -> Vector3<f32> {
         let mut point = Vector3::new(0.,0.,0.);
         let mut N = Vector3::new(0.,0.,0.);
         let mut material = Material::matte(Vector3::new(0.,0.,0.));
         let depth = depth.unwrap_or(0);
         let mut diffuse_light_intensity = 0.;
 
-        if depth > 4 || !scene_intersect(orig, dir, spheres, &mut point, &mut N, &mut material) {
+        if depth > 4 || !scene_intersect(orig, dir, spheres, &mut point, &mut N, &mut material, checkerboard) {
             return Vector3::new(0.2, 0.7, 0.8); // background color
         }
 
@@ -122,11 +122,11 @@ pub mod render_funcs {
 
                 let reflect_dir = reflect(dir, &N);
                 let reflect_orig = if reflect_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 };
-                let reflect_color = cast_ray(&reflect_orig, &reflect_dir, spheres, lights, Some(depth + 1));
+                let reflect_color = cast_ray(&reflect_orig, &reflect_dir, spheres, lights, Some(depth + 1), checkerboard);
 
                 let refract_dir = refract(dir, &N, &refractive_index, &1.).normalize();
                 let refract_orig = if refract_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 };
-                let refract_color = cast_ray(&refract_orig, &refract_dir, spheres, lights, Some(depth + 1));
+                let refract_color = cast_ray(&refract_orig, &refract_dir, spheres, lights, Some(depth + 1), checkerboard);
 
                 if let Some(light_vec) = lights {
                     for l in light_vec {
@@ -138,7 +138,7 @@ pub mod render_funcs {
                         let mut shadow_N = Vector3::new(0.,0.,0.);
                         let mut tmp_material = Material::matte(Vector3::new(0.,0.,0.));
 
-                        if scene_intersect(&shadow_orig, &light_dir, spheres, &mut shadow_point, &mut shadow_N, &mut tmp_material) && (shadow_point-shadow_orig).norm() < light_distance {
+                        if scene_intersect(&shadow_orig, &light_dir, spheres, &mut shadow_point, &mut shadow_N, &mut tmp_material, checkerboard) && (shadow_point-shadow_orig).norm() < light_distance {
                             continue;
                         }
 
@@ -153,7 +153,7 @@ pub mod render_funcs {
         }
     }
 
-    fn scene_intersect(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, hit: &mut Vector3<f32>, N: &mut Vector3<f32>, material: &mut Material) -> bool {
+    fn scene_intersect(orig: &Vector3<f32>, dir: &Vector3<f32>, spheres: &Vec<Sphere>, hit: &mut Vector3<f32>, N: &mut Vector3<f32>, material: &mut Material, checkerboard: bool) -> bool {
         let mut spheres_dist = f32::MAX;
         for s in spheres.iter() {
             let mut dist_i = 0.;
@@ -163,6 +163,29 @@ pub mod render_funcs {
                 *N = (*hit - s.center).normalize();
                 *material = s.material;
             }
+        }
+
+        if checkerboard {
+            let mut checkerboard_dist: f32 = f32::MAX;
+            if dir.y.abs() > 1e-3  {
+                let d: f32 = -(orig.y + 4.) / dir.y; // the checkerboard plane has equation y = -4
+                let pt: Vector3<f32> = orig + dir * d;
+                if d > 0. && pt.x.abs() < 10. && pt.z < -10. && pt.z > -30. && d < spheres_dist {
+                    checkerboard_dist = d;
+                    *hit = pt;
+                    *N = Vector3::new(0., 1., 0.);
+                    let white_square = ((0.5 * hit.x + 1000.) as i32 + (0.5 * hit.z) as i32) & 1 != 0;
+                    match material {
+                        Material::Matte(Matte { ref mut diffuse_color }) => {
+                            *diffuse_color = if white_square { Vector3::new(0.3, 0.3, 0.3) } else { Vector3::new(0.3, 0.2, 0.1) };
+                        },
+                        Material::Smooth(Smooth {albedo, refractive_index, ref mut diffuse_color, specular_exponent }) => {
+                            *diffuse_color = if white_square { Vector3::new(0.3, 0.3, 0.3) } else { Vector3::new(0.3, 0.2, 0.1) };
+                        }
+                    }
+                }
+            }
+            return spheres_dist.min(checkerboard_dist) < 1000.;
         }
         spheres_dist < 1000.
     }
