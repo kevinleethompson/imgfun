@@ -110,6 +110,17 @@ pub mod render_funcs {
                 if let Some(light_vec) = lights {
                     for l in light_vec {
                         let light_dir: Vector3<f32> = (l.position - point).normalize();
+                        let light_distance: f32 = (l.position - point).norm();
+
+                        let shadow_orig: Vector3<f32> = if light_dir.dot(&N) < 0. { point - N*1e-3 } else { point + N*1e-3 }; // checking if the point lies in the shadow of the lights[i]
+                        let mut shadow_point = Vector3::new(0.,0.,0.);
+                        let mut shadow_N = Vector3::new(0.,0.,0.);
+                        let mut tmp_material = Material::matte(Vector3::new(0.,0.,0.));
+
+                        if scene_intersect(&shadow_orig, &light_dir, spheres, &mut shadow_point, &mut shadow_N, &mut tmp_material, checkerboard) && (shadow_point-shadow_orig).norm() < light_distance {
+                            continue;
+                        }
+
                         diffuse_light_intensity += l.intensity * 0f32.max(light_dir.dot(&N));
                     }
                     diffuse_color * diffuse_light_intensity
