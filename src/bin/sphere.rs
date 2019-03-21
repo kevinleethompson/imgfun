@@ -6,7 +6,7 @@ use utils::objects::{Sphere, Material};
 use utils::render_funcs::save_ppm_image;
 
 fn main() {
-    render(Sphere::new(Vector3::new(-3., 0., -16.), 2., Material{ diffuse_color: Vector3::new(-3., 0., -16.) }));
+    render(Sphere::new(Vector3::new(-3., 0., -16.), 2., Material::new(Vector3::new(-3., 0., -16.), None, None, None, None)));
 }
 
 fn render(sphere: Sphere) {

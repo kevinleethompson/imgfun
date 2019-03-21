@@ -2,14 +2,16 @@ use std::f32;
 
 mod utils;
 use utils::{Vector3, Vector4};
-use utils::objects::{Sphere, Material, Light};
+use utils::objects::{Sphere, Material, MaterialQuality as mq, Light};
 use utils::render_funcs::{cast_ray, save_ppm_image};
 
 fn main() {
-    let ivory = Material::smooth(Vector4::new(0.6, 0.3, 0.1, 0.), 1., Vector3::new(0.4, 0.4, 0.3), 50.);
-    let red_rubber = Material::smooth(Vector4::new(0.9, 0.1, 0., 0.), 1., Vector3::new(0.3, 0.1, 0.1), 10.);
-    let mirror = Material::smooth(Vector4::new(0., 10., 0.8, 0.), 1., Vector3::new(1., 1., 1.), 1425.);
-    let glass = Material::smooth(Vector4::new(0., 0.5, 0.1, 0.8), 1.5, Vector3::new(0.6, 0.7, 0.8), 125.);
+    let mut base_qual = vec![mq::Smooth];
+    let add_quals = |v: &mut Vec<mq>, quals: &mut Vec<mq>| -> Vec<mq> { v.append(quals); v.clone() };
+    let ivory = Material::new(Vector3::new(0.4, 0.4, 0.3), Some(Vector4::new(0.6, 0.3, 0.1, 0.)), Some(1.), Some(50.), Some(base_qual.clone()));
+    let red_rubber = Material::new(Vector3::new(0.3, 0.1, 0.1), Some(Vector4::new(0.9, 0.1, 0., 0.)), Some(1.), Some(10.), Some(base_qual.clone()));
+    let mirror = Material::new(Vector3::new(1., 1., 1.), Some(Vector4::new(0., 10., 0.8, 0.)), Some(1.), Some(1425.), Some(add_quals(&mut base_qual, &mut vec![mq::Reflective])));
+    let glass = Material::new(Vector3::new(0.6, 0.7, 0.8), Some(Vector4::new(0., 0.5, 0.1, 0.8)), Some(1.5), Some(125.), Some(add_quals(&mut base_qual, &mut vec![mq::Reflective, mq::Refractive])));
 
     let spheres = vec![
         Sphere::new(Vector3::new(-3., 0., -16.), 2., ivory),

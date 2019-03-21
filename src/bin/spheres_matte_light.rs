@@ -1,17 +1,18 @@
 use std::f32;
 
 mod utils;
-use utils::{Vector3};
-use utils::objects::{Sphere, Material, Light};
+use utils::{Vector3, Vector4};
+use utils::objects::{Sphere, Material, MaterialQuality as mq, Light};
 use utils::render_funcs::{cast_ray, save_ppm_image};
 
 fn main() {
-    let ivory = Material::matte(Vector3::new(0.4, 0.4, 0.3));
-    let red_rubber = Material::matte(Vector3::new(0.3, 0.1, 0.1));
+    let base_qual = vec![mq::Matte];
+    let ivory = Material::new(Vector3::new(0.4, 0.4, 0.3), Some(Vector4::new(0.6, 0.3, 0.1, 0.)), Some(1.), Some(50.), Some(base_qual.clone()));
+    let red_rubber = Material::new(Vector3::new(0.3, 0.1, 0.1), Some(Vector4::new(0.9, 0.1, 0., 0.)), Some(1.), Some(10.), Some(base_qual));
 
     let spheres = vec![
-        Sphere::new(Vector3::new(-3., 0., -16.), 2., ivory),
-        Sphere::new(Vector3::new(-1.0, -1.5, -12.), 2., red_rubber),
+        Sphere::new(Vector3::new(-3., 0., -16.), 2., ivory.clone()),
+        Sphere::new(Vector3::new(-1.0, -1.5, -12.), 2., red_rubber.clone()),
         Sphere::new(Vector3::new( 1.5, -0.5, -18.), 3., red_rubber),
         Sphere::new(Vector3::new(7., 5., -18.), 4., ivory)
     ];
